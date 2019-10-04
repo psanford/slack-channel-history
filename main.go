@@ -72,7 +72,7 @@ func main() {
 			t := unixtime.ToTime(int64(ts), time.Second)
 			lastTime = t
 
-			fmt.Printf("%s %s\n", t.Format(time.RFC3339), msg.Text)
+			fmt.Printf("%s %-8.8s: %s\n", t.Format(time.RFC3339), msg.Username, msg.Text)
 		}
 	}
 }
