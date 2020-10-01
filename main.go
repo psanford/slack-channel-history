@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nlopes/slack"
@@ -13,7 +18,9 @@ import (
 
 var daysAgo = flag.Int("ago", 90, "Number of days back")
 var apiToken = flag.String("api_token", "", "API token")
+var cookie = flag.String("cookie", "", "Cookie (only for session tokens)")
 var channelName = flag.String("channel", "", "Channel name")
+var printAttachments = flag.Bool("attachments", false, "Print attachments")
 
 func main() {
 	flag.Parse()
@@ -26,7 +33,32 @@ func main() {
 		log.Fatal("-channel is required")
 	}
 
-	api := slack.New(*apiToken)
+	var options []slack.Option
+	if *cookie != "" {
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			panic(err)
+		}
+		u, err := url.Parse("https://slack.com")
+		if err != nil {
+			panic(err)
+		}
+
+		fakeReq := fmt.Sprintf("GET / HTTP/1.0\r\nCookie: %s\r\n\r\n", *cookie)
+		req, err := http.ReadRequest(bufio.NewReader(strings.NewReader(fakeReq)))
+		if err != nil {
+			panic(err)
+		}
+
+		jar.SetCookies(u, req.Cookies())
+		client := http.Client{
+			Jar: jar,
+		}
+		options = append(options, slack.OptionHTTPClient(&client))
+	}
+
+	api := slack.New(*apiToken, options...)
+
 	channels, err := api.GetChannels(false)
 	if err != nil {
 		log.Fatalf("GetChannels error: %s", err)
@@ -73,6 +105,11 @@ func main() {
 			lastTime = t
 
 			fmt.Printf("%s %-8.8s: %s\n", t.Format(time.RFC3339), msg.Username, msg.Text)
+			if *printAttachments {
+				for _, atmt := range msg.Attachments {
+					fmt.Printf("atmt: %s\n", atmt.Fallback)
+				}
+			}
 		}
 	}
 }
