@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ var apiToken = flag.String("api_token", "", "API token")
 var cookie = flag.String("cookie", "", "Cookie (only for session tokens)")
 var channelName = flag.String("channel", "", "Channel name")
 var printAttachments = flag.Bool("attachments", false, "Print attachments")
+var dumpJson = flag.Bool("json", false, "Dump a JSON stream")
 
 func main() {
 	flag.Parse()
@@ -94,6 +97,7 @@ func main() {
 		if len(history.Messages) < 1 {
 			break
 		}
+		outJson := json.NewEncoder(os.Stdout)
 
 		for _, msg := range history.Messages {
 			ts, err := strconv.ParseFloat(msg.Timestamp, 64)
@@ -104,10 +108,17 @@ func main() {
 			t := unixtime.ToTime(int64(ts), time.Second)
 			lastTime = t
 
-			fmt.Printf("%s %-8.8s: %s\n", t.Format(time.RFC3339), msg.Username, msg.Text)
-			if *printAttachments {
-				for _, atmt := range msg.Attachments {
-					fmt.Printf("atmt: %s\n", atmt.Fallback)
+			if *dumpJson {
+				err := outJson.Encode(msg)
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				fmt.Printf("%s %-8.8s: %s\n", t.Format(time.RFC3339), msg.Username, msg.Text)
+				if *printAttachments {
+					for _, atmt := range msg.Attachments {
+						fmt.Printf("atmt: %s\n", atmt.Fallback)
+					}
 				}
 			}
 		}
